@@ -185,9 +185,11 @@ Each session in `sessions` has:
 
 ```
 harness run <config.yaml>     Run an experiment
-harness list                  List completed runs
-harness inspect <run_dir>     Show run details
+harness list [--json]         List completed runs
+harness inspect <run_dir> [--json]   Show run details
 ```
+
+All commands support `--json` for machine-readable output.
 
 ### `harness run`
 

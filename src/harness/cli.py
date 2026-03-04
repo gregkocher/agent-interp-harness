@@ -54,17 +54,25 @@ def run(
 @app.command(name="list")
 def list_runs(
     runs_dir: Annotated[Path, typer.Option(help="Runs directory")] = Path("runs"),
+    output_json: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """List all completed runs."""
     if not runs_dir.exists():
-        typer.echo("No runs directory found.")
+        if output_json:
+            typer.echo("[]")
+        else:
+            typer.echo("No runs directory found.")
         raise typer.Exit()
 
     run_dirs = sorted(runs_dir.iterdir())
     if not run_dirs:
-        typer.echo("No runs found.")
+        if output_json:
+            typer.echo("[]")
+        else:
+            typer.echo("No runs found.")
         raise typer.Exit()
 
+    json_entries = []
     for d in run_dirs:
         if not d.is_dir():
             continue
@@ -72,25 +80,42 @@ def list_runs(
         if meta_path.exists():
             with open(meta_path) as f:
                 meta = json.load(f)
-            sessions = meta.get("session_count", "?")
-            mode = meta.get("session_mode", "?")
-            model_name = meta.get("model", "?")
-            steps = meta.get("total_steps", "?")
-            cost = meta.get("total_cost_usd")
-            cost_str = f"${cost:.4f}" if cost is not None else "n/a"
-            errors = len(meta.get("errors", []))
-            err_str = f" [{errors} errors]" if errors else ""
-            typer.echo(
-                f"  {d.name}  |  {model_name}  |  {mode}  |  "
-                f"{sessions} sessions, {steps} steps  |  {cost_str}{err_str}"
-            )
-        else:
+
+            if output_json:
+                json_entries.append({
+                    "run_name": d.name,
+                    "model": meta.get("model"),
+                    "session_mode": meta.get("session_mode"),
+                    "session_count": meta.get("session_count"),
+                    "total_steps": meta.get("total_steps"),
+                    "total_cost_usd": meta.get("total_cost_usd"),
+                    "errors": meta.get("errors", []),
+                    "path": str(d),
+                })
+            else:
+                sessions = meta.get("session_count", "?")
+                mode = meta.get("session_mode", "?")
+                model_name = meta.get("model", "?")
+                steps = meta.get("total_steps", "?")
+                cost = meta.get("total_cost_usd")
+                cost_str = f"${cost:.4f}" if cost is not None else "n/a"
+                errors = len(meta.get("errors", []))
+                err_str = f" [{errors} errors]" if errors else ""
+                typer.echo(
+                    f"  {d.name}  |  {model_name}  |  {mode}  |  "
+                    f"{sessions} sessions, {steps} steps  |  {cost_str}{err_str}"
+                )
+        elif not output_json:
             typer.echo(f"  {d.name}  |  (no metadata)")
+
+    if output_json:
+        typer.echo(json.dumps(json_entries, indent=2, default=str))
 
 
 @app.command()
 def inspect(
     run_dir: Annotated[Path, typer.Argument(help="Path to run directory")],
+    output_json: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Inspect a completed run: sessions, steps, tool calls, writes, compaction."""
     meta_path = run_dir / "run_meta.json"
@@ -100,6 +125,25 @@ def inspect(
 
     with open(meta_path) as f:
         meta = json.load(f)
+
+    # Add changelog to meta for JSON output
+    changelog_events = []
+    changelog = run_dir / "state_changelog.jsonl"
+    if changelog.exists() and changelog.stat().st_size > 0:
+        with open(changelog) as f:
+            for line in f:
+                event = json.loads(line)
+                changelog_events.append({
+                    "session_index": event["session_index"],
+                    "step_id": event["step_id"],
+                    "file_path": event["file_path"],
+                    "diff_stats": event.get("diff_stats", {}),
+                })
+
+    if output_json:
+        meta["file_changes"] = changelog_events
+        typer.echo(json.dumps(meta, indent=2, default=str))
+        return
 
     typer.echo(f"Run: {meta['run_name']}")
     typer.echo(f"Model: {meta['model']} ({meta.get('provider', 'unknown')})")
@@ -141,20 +185,16 @@ def inspect(
             f"{cost_str}{sub_str}{resume_str}{err_str}"
         )
 
-    # Show changelog summary
-    changelog = run_dir / "state_changelog.jsonl"
-    if changelog.exists() and changelog.stat().st_size > 0:
+    if changelog_events:
         typer.echo("")
         typer.echo("File changes:")
-        with open(changelog) as f:
-            for line in f:
-                event = json.loads(line)
-                stats = event.get("diff_stats", {})
-                typer.echo(
-                    f"  session {event['session_index']}, step {event['step_id']}: "
-                    f"{event['file_path']} "
-                    f"(+{stats.get('added', 0)}/-{stats.get('removed', 0)})"
-                )
+        for event in changelog_events:
+            stats = event["diff_stats"]
+            typer.echo(
+                f"  session {event['session_index']}, step {event['step_id']}: "
+                f"{event['file_path']} "
+                f"(+{stats.get('added', 0)}/-{stats.get('removed', 0)})"
+            )
 
 
 if __name__ == "__main__":
