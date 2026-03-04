@@ -2,7 +2,7 @@
 
 A harness for running multi-session agent trajectories using the Claude Agent SDK, capturing them in [ATIF](https://harborframework.com/docs/agents/trajectory-format) (Agent Trajectory Interchange Format), and tracking file state changes across sessions.
 
-Built for agent interpretability research — studying how LLM agents behave across multi-turn, multi-session interactions with codebases.
+Built for agent interpretability research — studying how LLM agents behave across multi-turn, multi-session, multi-agent interactions.
 
 ## What it does
 
