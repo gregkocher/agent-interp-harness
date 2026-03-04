@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timezone
+from importlib.metadata import version as pkg_version
 from pathlib import Path
 
 import yaml
@@ -129,10 +130,18 @@ def _build_run_meta(
     results: list[SessionResult],
     state: StateManager,
 ) -> dict:
+    def _get_version(pkg: str) -> str | None:
+        try:
+            return pkg_version(pkg)
+        except Exception:
+            return None
+
     return {
         "run_name": run_name,
         "model": config.model,
         "provider": config.provider,
+        "sdk_version": _get_version("claude-agent-sdk"),
+        "harness_version": _get_version("agent-interp-harness"),
         "session_mode": config.session_mode.value,
         "repo_path": config.repo_path,
         "repo_name": config.repo_name,

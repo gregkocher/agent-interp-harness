@@ -169,6 +169,7 @@ Subagent messages are filtered from the parent trajectory to keep it clean. The 
 | `load_project_settings` | no | `false` | Load repo's CLAUDE.md and .claude/settings.json |
 | `agents` | no | `[]` | Subagent definitions (see [Subagents](#subagents)) |
 | `capture_subagent_trajectories` | no | `true` | Save separate ATIF trajectories for each subagent invocation |
+| `capture_api_requests` | no | `false` | Capture raw API requests via proxy (system prompt, tools, compaction) |
 | `run_name` | no | auto-generated | Custom name for the run directory |
 | `tags` | no | `[]` | Metadata tags |
 
@@ -232,6 +233,7 @@ runs/<run_name>/
 ├── session_01/
 │   ├── trajectory.json         # ATIF v1.6 trajectory (parent)
 │   ├── subagent_<name>_<id>.json  # subagent ATIF trajectory (if any)
+│   ├── api_captures.jsonl      # raw API request log (if capture enabled)
 │   ├── state_before/           # tracked files before this session
 │   ├── state_after/            # tracked files after this session
 │   └── state_diff.patch        # unified diff of changes
@@ -266,6 +268,17 @@ Each session produces a `trajectory.json` in [ATIF v1.6](https://harborframework
   "diff_stats": {"added": 9, "removed": 0}
 }
 ```
+
+### API request capture
+
+When `capture_api_requests: true` is set (or `--capture-requests` CLI flag), the harness runs a local reverse proxy between the SDK and the API. This captures data not available in the SDK message stream:
+
+- **System prompt** — Claude Code's full built-in system prompt (not just your `system_prompt` config)
+- **Tool definitions** — JSON schemas for each tool (Read, Write, Bash, etc.)
+- **Compaction content** — when context is compacted, the summarized messages that replace history
+- **Sampling parameters** — model, temperature, max_tokens
+
+The proxy logs to `api_captures.jsonl` in each session directory. System prompt and tools are logged in full on the first request and on change; otherwise only a hash is recorded to keep file sizes small.
 
 ## Architecture
 

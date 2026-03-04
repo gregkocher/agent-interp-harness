@@ -32,6 +32,7 @@ def run(
     session_mode: Annotated[Optional[SessionMode], typer.Option(help="Override session mode")] = None,
     run_name: Annotated[Optional[str], typer.Option(help="Custom run name")] = None,
     runs_dir: Annotated[Path, typer.Option(help="Output directory")] = Path("runs"),
+    capture_requests: Annotated[bool, typer.Option(help="Capture API requests (system prompt, tools, compaction)")] = False,
 ) -> None:
     """Run a multi-session experiment from a config file."""
     config = load_config(config_path)
@@ -44,6 +45,8 @@ def run(
         config.session_mode = session_mode
     if run_name:
         config.run_name = run_name
+    if capture_requests:
+        config.capture_api_requests = True
 
     from harness.experiment import run_experiment
 

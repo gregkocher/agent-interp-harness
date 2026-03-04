@@ -23,6 +23,7 @@ from harbor.models.trajectories import SubagentTrajectoryRef
 
 from harness.atif_adapter import ATIFAdapter
 from harness.config import RunConfig, SessionConfig, build_provider_env
+from harness.proxy import CaptureProxy, get_target_url
 from harness.state import StateManager
 
 logger = logging.getLogger(__name__)
@@ -120,6 +121,17 @@ async def run_session(
         if fork:
             options.fork_session = True
 
+    # Start capture proxy if configured
+    proxy: CaptureProxy | None = None
+    if run_config.capture_api_requests:
+        target_url = get_target_url(run_config.provider, run_config.base_url)
+        proxy = CaptureProxy()
+        port = await proxy.start(
+            target_url, session_dir / "api_captures.jsonl"
+        )
+        provider_env["ANTHROPIC_BASE_URL"] = f"http://127.0.0.1:{port}"
+        options.env = provider_env
+
     # Run the session
     session_id: str | None = None
     tool_call_count = 0
@@ -153,6 +165,9 @@ async def run_session(
     except Exception as e:
         logger.exception("Session %d failed", session_config.session_index)
         error = str(e)
+    finally:
+        if proxy:
+            await proxy.stop()
 
     # Final write check — catch writes from the last step
     state_manager.check_for_writes(
