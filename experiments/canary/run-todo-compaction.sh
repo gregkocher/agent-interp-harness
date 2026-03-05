@@ -19,3 +19,8 @@ echo "All TODO compaction experiments complete."
 echo ""
 echo "Runs:"
 uv run harness list
+echo ""
+echo "================================================"
+echo "Running analysis..."
+echo "================================================"
+uv run python experiments/canary/analyze_todo_results.py --runs-dir runs --prefix canary-todo-compaction-rep
