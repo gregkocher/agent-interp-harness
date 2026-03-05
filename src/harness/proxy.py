@@ -84,19 +84,22 @@ class CaptureProxy:
         self._site: web.TCPSite | None = None
         self._runner: web.AppRunner | None = None
         self._request_index = 0
-        self._prev_message_count = 0
-        self._prev_system_hash: str | None = None
-        self._prev_tools_hash: str | None = None
         self._raw_dump_count = raw_dump_count  # dump full req/resp for first N requests
+        # Per-agent-context tracking (keyed by system_prompt_hash)
+        self._main_system_hash: str | None = None
+        self._per_agent_prev_count: dict[str | None, int] = {}
+        self._seen_system_hashes: set[str | None] = set()
+        self._seen_tools_hashes: set[str | None] = set()
 
     async def start(self, target_url: str, log_path: Path) -> int:
         """Start the proxy server. Returns the assigned port."""
         self._target_url = target_url.rstrip("/")
         self._log_path = log_path
         self._request_index = 0
-        self._prev_message_count = 0
-        self._prev_system_hash = None
-        self._prev_tools_hash = None
+        self._main_system_hash = None
+        self._per_agent_prev_count = {}
+        self._seen_system_hashes = set()
+        self._seen_tools_hashes = set()
 
         app = web.Application()
         app.router.add_route("*", "/{path:.*}", self._handle)
@@ -233,16 +236,33 @@ class CaptureProxy:
         system_hash = _hash(system) if system else None
         tools_hash = _hash(tools) if tools else None
 
-        # Detect compaction: message count dropped
+        # Classify agent context
+        if system is None and (not tools or len(tools) == 0):
+            agent_context = "sdk_internal"
+        elif self._main_system_hash is None:
+            # First request with a system prompt establishes the main agent
+            self._main_system_hash = system_hash
+            agent_context = "main"
+        elif system_hash == self._main_system_hash:
+            agent_context = "main"
+        else:
+            agent_context = "subagent"
+
+        # Per-context compaction detection
+        context_key = system_hash
+        prev_count = self._per_agent_prev_count.get(context_key, 0)
         is_compaction = (
-            message_count < self._prev_message_count
-            and self._prev_message_count > 0
+            message_count < prev_count
+            and prev_count > 0
+            and agent_context != "sdk_internal"
         )
+        self._per_agent_prev_count[context_key] = message_count
 
         # Build log entry
         entry: dict = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "request_index": self._request_index,
+            "agent_context": agent_context,
             "model": request_data.get("model"),
             "sampling_params": {
                 k: request_data.get(k)
@@ -252,19 +272,19 @@ class CaptureProxy:
             "message_count": message_count,
         }
 
-        # System prompt: full on first or change, hash-only otherwise
-        if system_hash != self._prev_system_hash:
+        # System prompt: full on first appearance, hash-only on repeat
+        if system_hash not in self._seen_system_hashes:
             entry["system_prompt"] = system
             entry["system_prompt_hash"] = system_hash
-            self._prev_system_hash = system_hash
+            self._seen_system_hashes.add(system_hash)
         else:
             entry["system_prompt_hash"] = system_hash
 
-        # Tools: full on first or change, hash-only otherwise
-        if tools_hash != self._prev_tools_hash:
+        # Tools: full on first appearance, hash-only on repeat
+        if tools_hash not in self._seen_tools_hashes:
             entry["tools"] = tools
             entry["tools_hash"] = tools_hash
-            self._prev_tools_hash = tools_hash
+            self._seen_tools_hashes.add(tools_hash)
         else:
             entry["tools_hash"] = tools_hash
 
@@ -273,11 +293,9 @@ class CaptureProxy:
         if is_compaction:
             entry["compacted_messages"] = messages
             logger.info(
-                "Compaction detected: message count %d -> %d",
-                self._prev_message_count, message_count,
+                "Compaction detected (context=%s): message count %d -> %d",
+                agent_context, prev_count, message_count,
             )
-
-        self._prev_message_count = message_count
 
         # Response metadata
         if response_meta.get("context_management"):
