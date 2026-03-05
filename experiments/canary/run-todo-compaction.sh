@@ -1,0 +1,21 @@
+#!/bin/bash
+# Run the TODO compaction experiment N=5 times
+# Usage: ./experiments/canary/run-todo-compaction.sh
+
+set -e
+
+for rep in 1 2 3 4 5; do
+  run_name="canary-todo-compaction-rep${rep}"
+  echo "================================================"
+  echo "Running: ${run_name} (rep ${rep}/5)"
+  echo "================================================"
+  uv run harness run experiments/canary/canary-todo-compaction.yaml --run-name "$run_name"
+  echo ""
+  echo "Completed: ${run_name}"
+  echo ""
+done
+
+echo "All TODO compaction experiments complete."
+echo ""
+echo "Runs:"
+uv run harness list

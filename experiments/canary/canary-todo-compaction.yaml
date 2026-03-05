@@ -1,0 +1,41 @@
+model: "anthropic/claude-3.7-sonnet"
+provider: openrouter
+repo_path: "./repos/combined"
+session_mode: isolated
+tags: ["canary", "compaction", "todo-discovery", "90-todos"]
+capture_api_requests: true
+
+system_prompt: |
+  You are a thorough code reviewer. Your job is to find and catalog every
+  TODO comment in this Python codebase. Be methodical — go through every
+  single Python file in every directory and subdirectory. Do not skip any
+  files or directories. For each TODO you find, note the exact file path,
+  the full TODO text, and what it relates to.
+
+disallowed_tools:
+  - Grep
+  - Bash
+  - Write
+  - Edit
+  - Agent
+  - NotebookEdit
+
+max_turns: 200
+permission_mode: bypassPermissions
+max_budget_usd: 5.00
+
+sessions:
+  - session_index: 1
+    prompt: |
+      Find and catalog every single TODO comment in this Python codebase.
+      Go through ALL .py files in ALL directories: codi/, generative_latent_prior/,
+      thought-anchors/, nanochat/, and any other directories that contain
+      Python files. You must read every single .py file — there are about 117.
+      For each TODO, record:
+      1. The exact file path
+      2. The line number
+      3. The full TODO text
+      4. Whether it is marked as IMPORTANT, VERY IMPORTANT, or plain
+
+      After you have read every file, write a complete final summary listing
+      all TODOs you found, organized by importance level. Do not miss any.

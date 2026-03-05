@@ -68,6 +68,7 @@ class RunConfig(BaseModel):
     allowed_tools: list[str] = Field(
         default=["Read", "Grep", "Glob", "Bash", "Write", "Edit"]
     )
+    disallowed_tools: list[str] = Field(default=[])
     max_turns: int = 50
     permission_mode: str = "acceptEdits"
 

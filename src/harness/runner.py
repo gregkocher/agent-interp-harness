@@ -90,6 +90,7 @@ async def run_session(
     options = ClaudeAgentOptions(
         system_prompt=system_prompt,
         allowed_tools=run_config.allowed_tools,
+        disallowed_tools=run_config.disallowed_tools,
         max_turns=max_turns,
         permission_mode=run_config.permission_mode,
         cwd=run_config.repo_path,
