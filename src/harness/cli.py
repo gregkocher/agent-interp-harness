@@ -32,7 +32,7 @@ def run(
     session_mode: Annotated[Optional[SessionMode], typer.Option(help="Override session mode")] = None,
     run_name: Annotated[Optional[str], typer.Option(help="Custom run name")] = None,
     runs_dir: Annotated[Path, typer.Option(help="Output directory")] = Path("runs"),
-    capture_requests: Annotated[bool, typer.Option(help="Capture API requests (system prompt, tools, compaction)")] = False,
+    no_capture: Annotated[bool, typer.Option(help="Disable API request capture (disables resampling)")] = False,
 ) -> None:
     """Run a multi-session experiment from a config file."""
     config = load_config(config_path)
@@ -45,8 +45,8 @@ def run(
         config.session_mode = session_mode
     if run_name:
         config.run_name = run_name
-    if capture_requests:
-        config.capture_api_requests = True
+    if no_capture:
+        config.capture_api_requests = False
 
     from harness.experiment import run_experiment
 
@@ -198,6 +198,26 @@ def inspect(
                 f"{event['file_path']} "
                 f"(+{stats.get('added', 0)}/-{stats.get('removed', 0)})"
             )
+
+
+@app.command()
+def resample(
+    run_dir: Annotated[Path, typer.Argument(help="Path to run directory")],
+    session: Annotated[int, typer.Option(help="Session index")] = 1,
+    request: Annotated[int, typer.Option(help="Request index to resample")] = 1,
+    count: Annotated[int, typer.Option(help="Number of resamples")] = 5,
+    model: Annotated[Optional[str], typer.Option(help="Override model (default: use original)")] = None,
+) -> None:
+    """Resample a specific API turn to get N fresh responses (no tool execution)."""
+    from harness.resample import run_resample
+
+    asyncio.run(run_resample(
+        run_dir=run_dir,
+        session_index=session,
+        request_index=request,
+        count=count,
+        model_override=model,
+    ))
 
 
 if __name__ == "__main__":

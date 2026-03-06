@@ -79,8 +79,8 @@ class RunConfig(BaseModel):
     agents: list[AgentConfig] = []
     capture_subagent_trajectories: bool = True
 
-    # capture
-    capture_api_requests: bool = False
+    # capture (required for resampling turns)
+    capture_api_requests: bool = True
 
     # budget
     max_budget_usd: float | None = None
