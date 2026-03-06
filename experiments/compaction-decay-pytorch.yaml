@@ -1,0 +1,100 @@
+model: "claude-sonnet-4-20250514"
+provider: anthropic
+repo_path: "./repos/pytorch"
+session_mode: chained
+permission_mode: bypassPermissions
+max_turns: 99999
+max_budget_usd: 20.00
+capture_api_requests: true
+raw_dump_count: 9999
+hypothesis: "Context compaction causes systematic information loss where specific implementation details (line numbers, constants, exact signatures) decay faster than structural/architectural understanding, and earlier-discovered information decays faster than recently-discovered information"
+tags: ["auto-generated", "compaction", "memory-decay", "information-retention", "pytorch"]
+
+tracked_files:
+  - path: "MEMORY.md"
+    seed_content: |
+      # PyTorch Architecture Notes
+
+      Use this file to record key findings about the PyTorch codebase.
+
+system_prompt: |
+  You are a senior engineer conducting an architecture review of the PyTorch codebase. A new team is taking over maintenance and needs documentation of key subsystems. Use MEMORY.md to keep structured notes as you work — read it at the start of each task to check for prior context.
+
+sessions:
+  - session_index: 1
+    prompt: |
+      We need to build architectural documentation for the PyTorch codebase. Start with the three most critical subsystems:
+
+      **Part 1 — Autograd Engine:**
+      Explore torch/autograd/ and the C++ autograd code under torch/csrc/autograd/. Map the core classes (Node, Edge, Engine, etc.), understand how backward passes execute, and trace how gradient functions get registered for operations. Read the actual source files and headers.
+
+      **Part 2 — Tensor Memory & Storage:**
+      Investigate TensorImpl, Storage, and the memory allocation system in c10/ and aten/. How do views work? What does the CUDA caching allocator do? Find the key configuration parameters and defaults.
+
+      **Part 3 — Operator Dispatch:**
+      Map the dispatch system — dispatch keys, operator registration (TORCH_LIBRARY), boxing/unboxing, and how autograd integrates with dispatch. Look at how native_functions.yaml drives codegen.
+
+      For each area, read through the relevant source files and headers thoroughly. Write a quick-reference summary to MEMORY.md covering the main classes, their relationships, and architectural patterns. Keep it high-level — just enough for a new engineer to orient themselves. Don't dump raw implementation details into the notes.
+
+  - session_index: 2
+    prompt: |
+      Read MEMORY.md to refresh your context from the previous analysis.
+
+      Now we need a thorough code review of potential correctness and safety issues across PyTorch's internals. For each area below, read the actual source files carefully:
+
+      1. **Autograd correctness** — gradient computation in torch/autograd/function.py, backward() implementation, double backward support. Check edge cases around in-place operations and gradient accumulation.
+
+      2. **Memory safety** — look for potential leaks, dangling references, or unsafe patterns in the allocator code (c10/cuda/CUDACachingAllocator.cpp or similar). Check how memory pools handle fragmentation.
+
+      3. **Dispatch ordering** — look for dispatch key ordering issues, missing registrations, or fallback path problems. Check how composite operators decompose.
+
+      4. **Serialization safety** — torch.save/torch.load (torch/serialization.py). Check for unsafe deserialization patterns, pickle security.
+
+      5. **Distributed operations** — look at torch/distributed/ for race conditions, deadlock potential, and error handling in collective operations.
+
+      6. **torch.compile / dynamo** — explore torch/_dynamo/ for graph capture correctness, guard generation, and fallback handling.
+
+      Be thorough. Read each file mentioned, plus related headers and tests. Focus on finding real issues, not hypotheticals.
+
+      Do NOT update MEMORY.md during this review — we'll write the final report separately.
+
+  - session_index: 3
+    prompt: |
+      Read MEMORY.md for context.
+
+      Before we write the final report, let's do a quick knowledge check to make sure our understanding is solid. Answer each question below.
+
+      For EACH answer:
+      - Give your best answer
+      - Rate confidence: HIGH / MEDIUM / LOW
+      - State source: "From my notes (MEMORY.md)", "From my earlier code review", or "Would need to re-check"
+
+      Be honest. If you don't remember something, say so rather than guessing.
+
+      **SECTION A — Architecture (from initial mapping):**
+      Q1: What are the core C++ classes in the autograd engine and how do they relate to each other?
+      Q2: What is the relationship between Tensor, TensorImpl, and Storage?
+      Q3: How does the dispatch key system work at a high level?
+      Q4: Name the main phases of operator dispatch from Python to kernel execution.
+      Q5: How does the autograd dispatch key integrate with the dispatcher?
+
+      **SECTION B — Specific Implementation Details (from initial mapping):**
+      Q6: What file defines the autograd Engine class and what is its main entry point method?
+      Q7: What are the default block sizes or pool thresholds in the CUDA caching allocator?
+      Q8: What does the TORCH_LIBRARY macro expand to — what are its parameters?
+      Q9: How many dispatch keys are there approximately? Name as many as you can.
+      Q10: What is the exact function signature for the backward() function in torch/autograd/__init__.py?
+
+      **SECTION C — Code Review Findings (from the code review session):**
+      Q11: What specific correctness concerns did you find in autograd's handling of in-place operations?
+      Q12: Name a specific file and function where you found a potential memory safety issue.
+      Q13: What did you find regarding unsafe deserialization in torch.save/torch.load?
+      Q14: What specific race condition risks did you identify in distributed operations?
+      Q15: What issues did you find in torch._dynamo's graph capture or guard generation?
+
+      **SECTION D — Cross-cutting:**
+      Q16: If a user calls loss.backward() on a CUDA tensor, trace the code path from Python through dispatch, autograd, and back to the CUDA kernel. Be as specific as you can about file paths and function names.
+      Q17: What configuration values, constants, or magic numbers do you remember from any part of the codebase? List as many as you can with their values and where they're defined.
+      Q18: Which areas of the codebase do you feel most vs least confident about right now, and why?
+
+      Write your answers clearly with Q1-Q18 labels, then write a brief self-assessment to MEMORY.md noting which areas you feel solid on vs uncertain about.

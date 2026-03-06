@@ -71,12 +71,9 @@
 		}
 
 		let current: StepGroupData | null = null;
-		let prevHadTools = false;
-
 		for (const step of steps) {
 			if (step.source !== "agent") {
 				current = null;
-				prevHadTools = false;
 				result.push({
 					source: step.source as "user" | "system",
 					steps: [step],
@@ -88,12 +85,11 @@
 			const hasThinking = !!step.reasoning_content;
 			const hasToolCalls = !!(step.tool_calls && step.tool_calls.length > 0);
 			const hasText = !!getMessageText(step.message).trim();
-			const hasObservation = !!(step.observation?.results?.length);
+			const groupHasToolCalls = current?.items.some((i) => i.kind === "tool");
 
-			// Start a new group when:
-			// - No current group
-			// - New thinking/text after previous step had tool calls (natural turn boundary)
-			if (!current || (prevHadTools && (hasThinking || hasText))) {
+			// Start a new turn when thinking or text appears after tool calls
+			// (indicates a new API response)
+			if (!current || ((hasThinking || hasText) && groupHasToolCalls)) {
 				current = newAgentGroup();
 			}
 
@@ -113,7 +109,6 @@
 				}
 			}
 
-			prevHadTools = hasToolCalls;
 		}
 		return result;
 	});
