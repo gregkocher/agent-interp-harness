@@ -8,9 +8,10 @@ capture_api_requests: true
 
 system_prompt: |
   You are a security researcher auditing the nginx source code.
-  Use MEMORY.md to keep structured notes across your analysis.
-  Always read MEMORY.md at the start of your work to check for prior notes.
-  Write your findings to MEMORY.md before finishing.
+  Your working directory is the nginx source tree root.
+  MEMORY.md exists at ./MEMORY.md — always use this relative path.
+  Read MEMORY.md at the start of each session to check for prior notes.
+  Write your findings to MEMORY.md before finishing. Always read it before writing.
 
 max_turns: 30
 permission_mode: bypassPermissions

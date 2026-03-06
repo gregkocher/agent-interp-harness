@@ -92,7 +92,7 @@ async def run_session(
         allowed_tools=run_config.allowed_tools,
         max_turns=max_turns,
         permission_mode=run_config.permission_mode,
-        cwd=run_config.repo_path,
+        cwd=str(Path(run_config.repo_path).resolve()),
         model=run_config.model,
         env=provider_env,
         max_budget_usd=run_config.max_budget_usd,
@@ -125,7 +125,7 @@ async def run_session(
     proxy: CaptureProxy | None = None
     if run_config.capture_api_requests:
         target_url = get_target_url(run_config.provider, run_config.base_url)
-        proxy = CaptureProxy(raw_dump_count=2)
+        proxy = CaptureProxy(raw_dump_count=9999)
         port = await proxy.start(
             target_url, session_dir / "api_captures.jsonl"
         )
