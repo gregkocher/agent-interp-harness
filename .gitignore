@@ -8,3 +8,4 @@ dist/
 .ruff_cache/
 .DS_Store
 openrouter_api_key.txt
+anthropic_api_key.txt
