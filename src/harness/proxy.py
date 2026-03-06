@@ -85,21 +85,26 @@ class CaptureProxy:
         self._runner: web.AppRunner | None = None
         self._request_index = 0
         self._raw_dump_count = raw_dump_count  # dump full req/resp for first N requests
-        # Per-agent-context tracking (keyed by system_prompt_hash)
-        self._main_system_hash: str | None = None
+        # Per-agent-context tracking (keyed by tools_hash — stable unlike system_hash)
+        self._main_tools_hash: str | None = None
         self._per_agent_prev_count: dict[str | None, int] = {}
         self._seen_system_hashes: set[str | None] = set()
         self._seen_tools_hashes: set[str | None] = set()
+        # Pre-compaction message buffer (per context)
+        self._per_context_prev_messages: dict[str | None, list] = {}
+        self._per_context_prev_meta: dict[str | None, dict] = {}
 
     async def start(self, target_url: str, log_path: Path) -> int:
         """Start the proxy server. Returns the assigned port."""
         self._target_url = target_url.rstrip("/")
         self._log_path = log_path
         self._request_index = 0
-        self._main_system_hash = None
+        self._main_tools_hash = None
         self._per_agent_prev_count = {}
         self._seen_system_hashes = set()
         self._seen_tools_hashes = set()
+        self._per_context_prev_messages = {}
+        self._per_context_prev_meta = {}
 
         app = web.Application()
         app.router.add_route("*", "/{path:.*}", self._handle)
@@ -223,6 +228,68 @@ class CaptureProxy:
 
                 return response
 
+    @staticmethod
+    def _classify_activity(messages: list | None) -> dict:
+        """Classify agent activity from the last assistant message before compaction."""
+        if not messages:
+            return {"classification": "unknown", "recent_tools": [], "last_assistant_preview": ""}
+
+        # Find the last assistant message
+        last_assistant = None
+        for msg in reversed(messages):
+            if msg.get("role") == "assistant":
+                last_assistant = msg
+                break
+
+        if last_assistant is None:
+            return {"classification": "unknown", "recent_tools": [], "last_assistant_preview": ""}
+
+        content = last_assistant.get("content", [])
+        if isinstance(content, str):
+            content = [{"type": "text", "text": content}]
+
+        tool_names = []
+        text_parts = []
+        for block in content if isinstance(content, list) else []:
+            if isinstance(block, dict):
+                if block.get("type") == "tool_use":
+                    tool_names.append(block.get("name", "unknown"))
+                elif block.get("type") == "text":
+                    text_parts.append(block.get("text", ""))
+
+        assistant_text = " ".join(text_parts).strip()
+
+        TOOL_CATEGORIES = {
+            "Read": "file_reading",
+            "Glob": "searching",
+            "Grep": "searching",
+            "Write": "code_editing",
+            "Edit": "code_editing",
+            "MultiEdit": "code_editing",
+            "Bash": "command_execution",
+            "TodoWrite": "memory_writing",
+            "Agent": "subagent_delegation",
+        }
+
+        categories = set()
+        for tool in tool_names:
+            categories.add(TOOL_CATEGORIES.get(tool, "other"))
+
+        if not tool_names and assistant_text:
+            classification = "planning"
+        elif len(categories) == 1:
+            classification = categories.pop()
+        elif len(categories) > 1:
+            classification = "mixed"
+        else:
+            classification = "unknown"
+
+        return {
+            "classification": classification,
+            "recent_tools": tool_names,
+            "last_assistant_preview": assistant_text[:200],
+        }
+
     def _log_exchange(self, request_data: dict, response_meta: dict) -> None:
         """Log combined request + response metadata to JSONL."""
         if not self._log_path:
@@ -236,20 +303,19 @@ class CaptureProxy:
         system_hash = _hash(system) if system else None
         tools_hash = _hash(tools) if tools else None
 
-        # Classify agent context
-        if system is None and (not tools or len(tools) == 0):
+        # Classify agent context using tools_hash (stable, unlike system_hash)
+        if tools_hash is None or (not tools or len(tools) == 0):
             agent_context = "sdk_internal"
-        elif self._main_system_hash is None:
-            # First request with a system prompt establishes the main agent
-            self._main_system_hash = system_hash
+        elif self._main_tools_hash is None:
+            self._main_tools_hash = tools_hash
             agent_context = "main"
-        elif system_hash == self._main_system_hash:
+        elif tools_hash == self._main_tools_hash:
             agent_context = "main"
         else:
             agent_context = "subagent"
 
-        # Per-context compaction detection
-        context_key = system_hash
+        # Per-context compaction detection (keyed by tools_hash)
+        context_key = tools_hash
         prev_count = self._per_agent_prev_count.get(context_key, 0)
         is_compaction = (
             message_count < prev_count
@@ -288,14 +354,33 @@ class CaptureProxy:
         else:
             entry["tools_hash"] = tools_hash
 
-        # Compaction: capture the summarized messages
+        # Compaction: capture pre- and post-compaction snapshots
         entry["is_compaction"] = is_compaction
         if is_compaction:
             entry["compacted_messages"] = messages
+            # Attach buffered pre-compaction snapshot
+            prev_meta = self._per_context_prev_meta.get(context_key, {})
+            prev_msgs = self._per_context_prev_messages.get(context_key)
+            if prev_msgs is not None:
+                entry["pre_compaction_messages"] = prev_msgs
+                entry["pre_compaction_message_count"] = prev_meta.get("message_count", prev_count)
+                entry["pre_compaction_request_index"] = prev_meta.get("request_index")
+                entry["pre_compaction_timestamp"] = prev_meta.get("timestamp")
+            entry["activity_at_compaction"] = self._classify_activity(prev_msgs)
             logger.info(
-                "Compaction detected (context=%s): message count %d -> %d",
+                "Compaction detected (context=%s): message count %d -> %d, activity=%s",
                 agent_context, prev_count, message_count,
+                entry["activity_at_compaction"].get("classification", "unknown"),
             )
+
+        # Buffer current messages for next compaction detection
+        if agent_context != "sdk_internal":
+            self._per_context_prev_messages[context_key] = messages
+            self._per_context_prev_meta[context_key] = {
+                "request_index": self._request_index,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "message_count": message_count,
+            }
 
         # Response metadata
         if response_meta.get("context_management"):

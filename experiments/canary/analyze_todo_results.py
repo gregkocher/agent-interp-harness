@@ -205,7 +205,8 @@ def load_compaction_events(run_dir: Path) -> list:
 
     Returns list of dicts with keys:
         request_index, message_count_before, message_count_after,
-        compacted_messages (the post-compaction context)
+        compacted_messages (post-compaction), pre_compaction_messages,
+        pre_compaction_timestamp, activity_at_compaction
     """
     api_cap_path = run_dir / "session_01" / "api_captures.jsonl"
     if not api_cap_path.exists():
@@ -220,37 +221,44 @@ def load_compaction_events(run_dir: Path) -> list:
         if cap.get("is_compaction"):
             events.append({
                 "request_index": cap.get("request_index"),
-                "message_count_before": prev_count,
+                "message_count_before": cap.get("pre_compaction_message_count", prev_count),
                 "message_count_after": cap.get("message_count", 0),
                 "compacted_messages": cap.get("compacted_messages", []),
+                "pre_compaction_messages": cap.get("pre_compaction_messages"),
+                "pre_compaction_timestamp": cap.get("pre_compaction_timestamp"),
+                "activity_at_compaction": cap.get("activity_at_compaction", {}),
                 "timestamp": cap.get("timestamp"),
             })
         prev_count = cap.get("message_count", prev_count)
     return events
 
 
-def map_request_index_to_step_id(trajectory: dict, api_cap_path: Path) -> dict:
-    """Build a mapping from api request_index to approximate trajectory step_id.
+def find_step_at_timestamp(trajectory: dict, timestamp_iso: str) -> int | None:
+    """Find the trajectory step_id whose timestamp is closest to and <= the given timestamp."""
+    from datetime import datetime as _dt
 
-    The proxy logs one entry per API request. Steps in the trajectory correspond
-    to SDK messages. We approximate by counting agent steps (which each trigger
-    one API request) and mapping sequentially.
-    """
-    if not api_cap_path.exists():
-        return {}
+    try:
+        target = _dt.fromisoformat(timestamp_iso)
+    except (ValueError, TypeError):
+        return None
 
-    caps = []
-    for line in api_cap_path.read_text().strip().split("\n"):
-        if line.strip():
-            caps.append(json.loads(line))
+    best_step_id = None
+    best_diff = None
 
-    # Each API request roughly corresponds to an agent turn.
-    # Build request_index -> message_count mapping
-    req_to_msg_count = {}
-    for cap in caps:
-        req_to_msg_count[cap["request_index"]] = cap.get("message_count", 0)
+    for step in trajectory["steps"]:
+        step_ts_str = step.get("timestamp")
+        if not step_ts_str:
+            continue
+        try:
+            step_ts = _dt.fromisoformat(step_ts_str)
+        except (ValueError, TypeError):
+            continue
+        diff = (target - step_ts).total_seconds()
+        if diff >= 0 and (best_diff is None or diff < best_diff):
+            best_diff = diff
+            best_step_id = step["step_id"]
 
-    return req_to_msg_count
+    return best_step_id
 
 
 def compute_compaction_step_boundaries(
@@ -258,36 +266,57 @@ def compute_compaction_step_boundaries(
 ) -> list:
     """Determine the step_id at which each compaction occurred.
 
-    Uses the request_index from compaction events and maps to step_ids by
-    counting how many API round-trips have occurred up to that point.
+    Uses pre_compaction_timestamp for accurate correlation when available,
+    falls back to request_index-based counting.
 
     Returns sorted list of step_ids where compaction happened.
     """
-    if not compaction_events or not api_cap_path.exists():
+    if not compaction_events:
         return []
-
-    caps = []
-    for line in api_cap_path.read_text().strip().split("\n"):
-        if line.strip():
-            caps.append(json.loads(line))
-
-    # Map request_index to the step_id at that point.
-    # Each API request corresponds to one agent turn. We count agent steps.
-    agent_step_ids = [
-        step["step_id"] for step in trajectory["steps"]
-        if step.get("source") == "agent" and (step.get("message") or step.get("tool_calls"))
-    ]
 
     compaction_step_ids = []
     for evt in compaction_events:
-        req_idx = evt["request_index"]
-        # request_index is 0-based; map to the agent step at that turn
-        if req_idx < len(agent_step_ids):
-            compaction_step_ids.append(agent_step_ids[req_idx])
-        elif agent_step_ids:
-            compaction_step_ids.append(agent_step_ids[-1])
+        step_id = None
+        # Prefer timestamp-based correlation
+        ts = evt.get("pre_compaction_timestamp") or evt.get("timestamp")
+        if ts:
+            step_id = find_step_at_timestamp(trajectory, ts)
+
+        # Fallback: message_count heuristic
+        if step_id is None:
+            msg_count = evt.get("message_count_before", 0)
+            approx_turn = msg_count // 2
+            agent_step_ids = [
+                s["step_id"] for s in trajectory["steps"]
+                if s.get("source") == "agent" and (s.get("message") or s.get("tool_calls"))
+            ]
+            if approx_turn < len(agent_step_ids):
+                step_id = agent_step_ids[approx_turn]
+            elif agent_step_ids:
+                step_id = agent_step_ids[-1]
+
+        if step_id is not None:
+            compaction_step_ids.append(step_id)
 
     return sorted(compaction_step_ids)
+
+
+def compute_compaction_loss(pre_messages: list | None, post_messages: list) -> dict:
+    """Compare pre- and post-compaction messages to quantify information loss."""
+    if not pre_messages or not post_messages:
+        return {"pre_chars": 0, "post_chars": 0, "compression_ratio": 0,
+                "pre_message_count": 0, "post_message_count": 0}
+
+    pre_text = json.dumps(pre_messages, default=str)
+    post_text = json.dumps(post_messages, default=str)
+
+    return {
+        "pre_chars": len(pre_text),
+        "post_chars": len(post_text),
+        "compression_ratio": len(post_text) / len(pre_text) if len(pre_text) > 0 else 0,
+        "pre_message_count": len(pre_messages),
+        "post_message_count": len(post_messages),
+    }
 
 
 def assign_discovery_epoch(discovery_step: int | None, compaction_step_ids: list) -> int:
@@ -531,6 +560,53 @@ def print_report(all_results: list):
     if not any_compaction:
         print("  No compaction events detected in any rep.")
     print()
+
+    # ── Activity at compaction time ──
+    if any_compaction:
+        print("── Activity at Compaction Time ──")
+        for r in all_results:
+            if not r["compaction_events"]:
+                continue
+            print(f"  {r['run_name']}:")
+            for i, evt in enumerate(r["compaction_events"]):
+                activity = evt.get("activity_at_compaction", {})
+                cls = activity.get("classification", "unknown")
+                tools = activity.get("recent_tools", [])
+                preview = activity.get("last_assistant_preview", "")[:80]
+                loss = compute_compaction_loss(
+                    evt.get("pre_compaction_messages"),
+                    evt.get("compacted_messages", []),
+                )
+                ratio_str = f"{loss['compression_ratio']:.1%}" if loss["pre_chars"] > 0 else "n/a"
+                print(f"    Compaction {i+1}: {cls} (tools: {tools})")
+                print(f"      messages: {loss['pre_message_count']} → {loss['post_message_count']}, "
+                      f"chars: {loss['pre_chars']:,} → {loss['post_chars']:,} ({ratio_str})")
+                if preview:
+                    print(f"      last msg: \"{preview}...\"")
+        print()
+
+        # ── Compaction loss summary ──
+        print("── Compaction Loss Summary ──")
+        all_ratios = []
+        activity_counts = defaultdict(int)
+        for r in all_results:
+            for evt in r["compaction_events"]:
+                loss = compute_compaction_loss(
+                    evt.get("pre_compaction_messages"),
+                    evt.get("compacted_messages", []),
+                )
+                if loss["pre_chars"] > 0:
+                    all_ratios.append(loss["compression_ratio"])
+                activity = evt.get("activity_at_compaction", {}).get("classification", "unknown")
+                activity_counts[activity] += 1
+        if all_ratios:
+            print(f"  Mean compression ratio: {sum(all_ratios)/len(all_ratios):.1%}")
+            print(f"  Min compression ratio:  {min(all_ratios):.1%}")
+            print(f"  Max compression ratio:  {max(all_ratios):.1%}")
+        print(f"  Activity distribution at compaction:")
+        for act, count in sorted(activity_counts.items(), key=lambda x: -x[1]):
+            print(f"    {act}: {count}")
+        print()
 
     # ── Discovery epoch distribution ──
     print("── Discovery Epoch Distribution ──")
