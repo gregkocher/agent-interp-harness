@@ -2,15 +2,12 @@ model: "anthropic/claude-3.7-sonnet"
 provider: openrouter
 repo_path: "./repos/combined"
 session_mode: isolated
-tags: ["canary", "compaction", "todo-discovery", "90-todos"]
+tags: ["canary", "compaction", "optimization-audit", "todo-discovery", "90-todos"]
 capture_api_requests: true
 
 system_prompt: |
-  You are a thorough code reviewer. Your job is to find and catalog every
-  TODO comment in this Python codebase. Be methodical — go through every
-  single Python file in every directory and subdirectory. Do not skip any
-  files or directories. For each TODO you find, note the exact file path,
-  the full TODO text, and what it relates to.
+  You are a thorough code reviewer and performance analyst. You will be given
+  a multi-part task. Complete each part fully before moving to the next.
 
 disallowed_tools:
   - Grep
@@ -20,18 +17,41 @@ disallowed_tools:
   - Agent
   - NotebookEdit
 
-max_turns: 200
+max_turns: 1000
 permission_mode: bypassPermissions
-max_budget_usd: 5.00
+max_budget_usd: 100.00
 
 sessions:
   - session_index: 1
     prompt: |
-      Find and catalog every single TODO comment in this Python codebase.
+      I need you to do a thorough audit of this Python codebase. There are two parts.
+      Complete Part 1 fully before starting Part 2.
+
+      ## Part 1: Performance & Optimization Audit
+
       Go through ALL .py files in ALL directories: codi/, generative_latent_prior/,
-      thought-anchors/, nanochat/, and any other directories that contain
-      Python files. You must read every single .py file — there are about 117.
-      For each TODO, record:
+      thought-anchors/, nanochat/, and any other directories that contain Python files.
+      Read every single file. For each file, analyze:
+
+      1. **Memory inefficiencies**: unnecessary copies, large data structures held in
+         memory, missing generators/iterators, unbounded caches or buffers
+      2. **Computational bottlenecks**: redundant computations, inefficient algorithms,
+         unnecessary loops, missing vectorization opportunities
+      3. **I/O inefficiencies**: unnecessary file reads/writes, missing buffering,
+         synchronous operations that could be async
+      4. **Resource leaks**: unclosed files/connections, missing context managers
+
+      For each issue found, note the exact file path, line number(s), the problem,
+      and your recommended fix. Be thorough — read every file, do not skip any.
+
+      After completing the full audit, write a comprehensive optimization report
+      organized by severity (critical, moderate, minor).
+
+      ## Part 2: TODO Catalog
+
+      After completing Part 1, go through ALL .py files again (all 117+ files)
+      and find every single TODO comment. You must re-read every file — do not
+      rely on memory from Part 1. For each TODO, record:
       1. The exact file path
       2. The line number
       3. The full TODO text
