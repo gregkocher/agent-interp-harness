@@ -13,12 +13,23 @@
 		source: "agent" | "user" | "system";
 		steps: Step[];
 		items: StepItem[];
+		agentGroupIndex?: number; // Nth agent group (0-based)
 	}
 
-	let { steps, runName = "", sessionIndex = 0 }: {
+	let {
+		steps,
+		runName = "",
+		sessionIndex = 0,
+		mainRequestIndices = [] as number[],
+		hasRawDumps = false,
+		resamples = {} as Record<number, number>,
+	}: {
 		steps: Step[];
 		runName?: string;
 		sessionIndex?: number;
+		mainRequestIndices?: number[];
+		hasRawDumps?: boolean;
+		resamples?: Record<number, number>;
 	} = $props();
 
 	function getMessageText(msg: string | { type: string; text?: string }[]): string {
@@ -46,9 +57,15 @@
 	let groups = $derived.by(() => {
 		const result: StepGroupData[] = [];
 		const resultMap = buildResultMap(steps);
+		let agentGroupCounter = 0;
 
 		function newAgentGroup(): StepGroupData {
-			const g: StepGroupData = { source: "agent", steps: [], items: [] };
+			const g: StepGroupData = {
+				source: "agent",
+				steps: [],
+				items: [],
+				agentGroupIndex: agentGroupCounter++,
+			};
 			result.push(g);
 			return g;
 		}
@@ -116,11 +133,17 @@
 				stepId={group.steps[0]?.step_id}
 			/>
 		{:else}
+			{@const agentIdx = group.agentGroupIndex ?? 0}
+			{@const requestIndex = mainRequestIndices[agentIdx] ?? undefined}
+			{@const sampleCount = requestIndex !== undefined ? (resamples[requestIndex] ?? 0) : 0}
 			<StepGroup
 				items={group.items}
 				stepIds={group.steps.map((s) => s.step_id)}
 				{runName}
 				{sessionIndex}
+				{requestIndex}
+				canResample={hasRawDumps && requestIndex !== undefined}
+				existingResampleCount={sampleCount}
 			/>
 		{/if}
 	{/each}
