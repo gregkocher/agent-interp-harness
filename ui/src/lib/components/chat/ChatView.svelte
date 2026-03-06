@@ -113,7 +113,7 @@
 	});
 </script>
 
-<div class="space-y-4 py-2">
+<div class="space-y-6 py-2">
 	{#each groups as group, i}
 		{#if group.source === "user"}
 			<UserMessage

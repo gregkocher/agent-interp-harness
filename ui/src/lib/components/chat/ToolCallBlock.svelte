@@ -73,7 +73,7 @@
 	let icon = $derived(toolIcons[call.function_name] || "\u{1F527}");
 </script>
 
-<div class="border-l-2 {isAgentCall ? 'border-blue-500' : 'border-border'} pl-3 py-1">
+<div class="border-l-2 {isAgentCall ? 'border-blue-500' : 'border-border'} pl-3 py-1.5">
 	<!-- Header -->
 	<div class="flex items-center gap-2 min-w-0">
 		<span class="text-xs shrink-0">{icon}</span>
@@ -83,7 +83,7 @@
 		{/if}
 		<button
 			onclick={() => (argsExpanded = !argsExpanded)}
-			class="text-[11px] text-muted-foreground/60 hover:text-foreground ml-auto shrink-0 transition-colors"
+			class="text-xs text-muted-foreground/60 hover:text-foreground ml-auto shrink-0 transition-colors"
 		>
 			{argsExpanded ? "hide args" : "args"}
 		</button>
@@ -93,7 +93,7 @@
 	{#if isAgentCall && subagentFilename}
 		<a
 			href="/runs/{runName}/sessions/{sessionIndex}/subagents/{subagentFilename}"
-			class="inline-flex items-center gap-1 text-[11px] text-blue-600 dark:text-blue-400 hover:underline mt-1"
+			class="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline mt-1.5"
 		>
 			View subagent trajectory &rarr;
 		</a>
@@ -101,20 +101,20 @@
 
 	<!-- Expandable args -->
 	{#if argsExpanded}
-		<pre class="text-xs font-mono bg-muted/50 rounded p-2 mt-1.5 overflow-x-auto whitespace-pre-wrap max-h-60 overflow-y-auto">{JSON.stringify(call.arguments, null, 2)}</pre>
+		<pre class="text-xs font-mono bg-muted/50 rounded p-2.5 mt-2 overflow-x-auto whitespace-pre-wrap max-h-60 overflow-y-auto">{JSON.stringify(call.arguments, null, 2)}</pre>
 	{/if}
 
 	<!-- Tool result -->
 	{#if resultText}
-		<div class="mt-1.5">
-			<div class="bg-muted/30 rounded p-2">
+		<div class="mt-2">
+			<div class="bg-muted/30 rounded p-2.5">
 				{#if resultExpanded || !resultNeedsTruncation}
 					<pre class="text-xs font-mono whitespace-pre-wrap overflow-x-auto max-h-80 overflow-y-auto">{resultText}</pre>
 				{:else}
 					<pre class="text-xs font-mono whitespace-pre-wrap overflow-x-auto">{resultPreview}</pre>
 					<button
 						onclick={() => (resultExpanded = true)}
-						class="text-[11px] text-primary hover:underline mt-1.5 block"
+						class="text-xs text-primary hover:underline mt-2 block"
 					>
 						Show all ({resultLines.length} lines)
 					</button>

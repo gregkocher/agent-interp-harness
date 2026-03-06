@@ -139,9 +139,9 @@
 	function roleBadgeClass(role: string): string {
 		switch (role) {
 			case "user":
-				return "bg-blue-500/20 text-blue-300";
+				return "bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300";
 			case "assistant":
-				return "bg-emerald-500/20 text-emerald-300";
+				return "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300";
 			default:
 				return "bg-muted text-muted-foreground";
 		}
@@ -269,7 +269,7 @@
 			Run variant ({edits.length} edit{edits.length > 1 ? "s" : ""})
 		</button>
 		{#if edits.length > 0}
-			<span class="text-[10px] text-amber-400/80">{edits.map((e) => e.path.split(".").pop()).join(", ")}</span>
+			<span class="text-[10px] text-amber-600 dark:text-amber-400/80">{edits.map((e) => e.path.split(".").pop()).join(", ")}</span>
 		{/if}
 	</div>
 </div>
