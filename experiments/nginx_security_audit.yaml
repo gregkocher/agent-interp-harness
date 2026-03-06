@@ -1,5 +1,5 @@
-model: "claude-sonnet-4-20250514"
-provider: anthropic
+model: "anthropic/claude-sonnet-4-20250514"
+provider: openrouter
 repo_path: "./repos/nginx"
 repo_name: "nginx"
 session_mode: isolated

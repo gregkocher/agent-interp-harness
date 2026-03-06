@@ -238,9 +238,9 @@ export const GET: RequestHandler = async ({ url }) => {
 
 /** POST: run new resamples (vanilla or variant) */
 export const POST: RequestHandler = async ({ request }) => {
-	const apiKey = env.ANTHROPIC_API_KEY;
+	const apiKey = env.ANTHROPIC_API_KEY || env.OPENROUTER_API_KEY;
 	if (!apiKey) {
-		return error(500, "ANTHROPIC_API_KEY not configured");
+		return error(500, "ANTHROPIC_API_KEY or OPENROUTER_API_KEY not configured");
 	}
 
 	const body = (await request.json()) as ResampleRequest;
