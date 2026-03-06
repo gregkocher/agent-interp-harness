@@ -170,58 +170,74 @@ async def run_session(
         if proxy:
             await proxy.stop()
 
-    # Final write check — catch writes from the last step
-    state_manager.check_for_writes(
-        session_config.session_index,
-        adapter._step_counter or 1,
-    )
-
-    # Save subagent trajectories (before parent, so we can attach refs)
+    # Post-processing: trajectory, state snapshots, etc.
+    # Wrapped so failures here don't kill the entire experiment.
+    traj_path: Path | None = None
+    step_count = 0
     subagent_count = 0
-    if capture_subagents:
-        sub_trajectories = adapter.build_subagent_trajectories()
-        ref_map: dict[str, SubagentTrajectoryRef] = {}
-        for tool_id, sub_traj in sub_trajectories.items():
-            agent_name = adapter._subagent_names.get(tool_id, "unknown")
-            safe_name = agent_name.replace("/", "_").replace(" ", "_")[:40]
-            sub_filename = f"subagent_{safe_name}_{tool_id[:12]}.json"
-            sub_path = session_dir / sub_filename
-            with open(sub_path, "w") as f:
-                json.dump(sub_traj.to_json_dict(), f, indent=2)
-            ref_map[tool_id] = SubagentTrajectoryRef(
-                session_id=sub_traj.session_id,
-                trajectory_path=sub_filename,
-                extra={"subagent_name": agent_name},
-            )
-            subagent_count += 1
-            logger.info("Saved subagent trajectory: %s", sub_filename)
-        # Attach refs to parent observation results
-        if ref_map:
-            adapter.attach_subagent_refs(ref_map)
 
-    # Build and save trajectory
-    trajectory = adapter.build_trajectory()
-    traj_path = session_dir / "trajectory.json"
-    with open(traj_path, "w") as f:
-        json.dump(trajectory.to_json_dict(), f, indent=2)
+    try:
+        # Final write check — catch writes from the last step
+        state_manager.check_for_writes(
+            session_config.session_index,
+            adapter._step_counter or 1,
+        )
 
-    # Snapshot state after session
-    state_manager.snapshot(session_dir / "state_after")
+        # Save subagent trajectories (before parent, so we can attach refs)
+        if capture_subagents:
+            sub_trajectories = adapter.build_subagent_trajectories()
+            ref_map: dict[str, SubagentTrajectoryRef] = {}
+            for tool_id, sub_traj in sub_trajectories.items():
+                agent_name = adapter._subagent_names.get(tool_id, "unknown")
+                safe_name = agent_name.replace("/", "_").replace(" ", "_")[:40]
+                sub_filename = f"subagent_{safe_name}_{tool_id[:12]}.json"
+                sub_path = session_dir / sub_filename
+                with open(sub_path, "w") as f:
+                    json.dump(sub_traj.to_json_dict(), f, indent=2)
+                ref_map[tool_id] = SubagentTrajectoryRef(
+                    session_id=sub_traj.session_id,
+                    trajectory_path=sub_filename,
+                    extra={"subagent_name": agent_name},
+                )
+                subagent_count += 1
+                logger.info("Saved subagent trajectory: %s", sub_filename)
+            # Attach refs to parent observation results
+            if ref_map:
+                adapter.attach_subagent_refs(ref_map)
 
-    # Compute session diff
-    state_manager.diff_session(
-        session_dir / "state_before",
-        session_dir / "state_after",
-        session_dir / "state_diff.patch",
-    )
+        # Build and save trajectory
+        trajectory = adapter.build_trajectory()
+        step_count = len(trajectory.steps)
+        traj_path = session_dir / "trajectory.json"
+        with open(traj_path, "w") as f:
+            json.dump(trajectory.to_json_dict(), f, indent=2)
 
-    # Refresh cache for next session
-    state_manager.refresh_cache()
+        # Snapshot state after session
+        state_manager.snapshot(session_dir / "state_after")
+
+        # Compute session diff
+        state_manager.diff_session(
+            session_dir / "state_before",
+            session_dir / "state_after",
+            session_dir / "state_diff.patch",
+        )
+
+        # Refresh cache for next session
+        state_manager.refresh_cache()
+
+    except Exception as e:
+        logger.exception(
+            "Session %d post-processing failed", session_config.session_index
+        )
+        if error:
+            error = f"{error}; post-processing: {e}"
+        else:
+            error = f"Post-processing failed: {e}"
 
     return SessionResult(
         session_index=session_config.session_index,
         session_id=session_id,
-        step_count=len(trajectory.steps),
+        step_count=step_count,
         tool_call_count=tool_call_count,
         trajectory_path=traj_path,
         resumed_from=resume_session_id,

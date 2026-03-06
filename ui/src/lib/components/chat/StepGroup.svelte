@@ -195,6 +195,7 @@
 				{@const html = renderMarkdown(item.content)}
 				<div
 					class="text-sm prose prose-sm dark:prose-invert max-w-none prose-p:my-1.5 prose-headings:my-2 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-pre:my-2 prose-pre:bg-muted prose-pre:text-xs prose-code:text-xs prose-code:before:content-none prose-code:after:content-none"
+					style="color: var(--foreground);"
 				>
 					{@html html}
 				</div>
@@ -205,15 +206,15 @@
 	</div>
 
 	<!-- Footer: step range + resample/edit buttons -->
-	<div class="flex items-center gap-2 mt-1 ml-1">
-		<span class="text-[11px] text-muted-foreground/60">{stepRange}</span>
+	<div class="flex items-center gap-3 mt-1.5 ml-1">
+		<span class="text-xs text-muted-foreground/50">{stepRange}</span>
 
 		{#if canResample}
 			<span class="text-muted-foreground/30">|</span>
 
 			<button
 				onclick={() => (showResampleForm = !showResampleForm)}
-				class="text-[11px] text-muted-foreground/60 hover:text-foreground transition-colors"
+				class="text-xs text-muted-foreground/60 hover:text-foreground transition-colors"
 			>
 				{#if totalSamples > 0}
 					{totalSamples} resamples
@@ -225,13 +226,13 @@
 			<button
 				onclick={openEditor}
 				disabled={isLoadingEditor}
-				class="text-[11px] text-violet-600 dark:text-violet-400/60 hover:text-violet-800 dark:hover:text-violet-300 transition-colors"
+				class="text-xs text-violet-600 dark:text-violet-400/60 hover:text-violet-800 dark:hover:text-violet-300 transition-colors"
 			>
 				{isLoadingEditor ? "Loading..." : "Edit & Resample"}
 			</button>
 
 			{#if requestIndex !== undefined}
-				<span class="text-[10px] text-muted-foreground/40 font-mono"
+				<span class="text-[11px] text-muted-foreground/40 font-mono"
 					>req#{requestIndex}</span
 				>
 			{/if}

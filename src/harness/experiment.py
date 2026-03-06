@@ -82,14 +82,23 @@ async def run_experiment(config: RunConfig, output_base: Path | None = None) -> 
         fork_desc = ", fork=True" if fork else ""
         print(f"[session {sc.session_index}] starting (mode={mode_desc}{resume_desc}{fork_desc})...")
 
-        result = await run_session(
-            session_config=sc,
-            run_config=config,
-            session_dir=session_dir,
-            state_manager=state,
-            resume_session_id=resume_id,
-            fork=fork,
-        )
+        try:
+            result = await run_session(
+                session_config=sc,
+                run_config=config,
+                session_dir=session_dir,
+                state_manager=state,
+                resume_session_id=resume_id,
+                fork=fork,
+            )
+        except Exception as e:
+            logger.exception("Session %d crashed", sc.session_index)
+            result = SessionResult(
+                session_index=sc.session_index,
+                error=f"CRASHED: {e}",
+                started_at=datetime.now(timezone.utc).isoformat(),
+                finished_at=datetime.now(timezone.utc).isoformat(),
+            )
         results.append(result)
 
         if sc.session_index == 1 and result.session_id:

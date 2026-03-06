@@ -17,19 +17,20 @@
 	);
 </script>
 
-<div class="space-y-8">
+<div style="display: flex; flex-direction: column; gap: 2rem;">
 	<div class="flex items-center justify-between">
 		<h1 class="text-lg font-semibold">Runs</h1>
 		<input
 			type="text"
 			placeholder="Filter by name, model, or tag..."
 			bind:value={search}
-			class="h-8 px-3 text-sm rounded-md border border-input bg-background w-64 placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring transition-colors"
+			style="height: 2.375rem; padding: 0 0.75rem; width: 18rem;"
+			class="text-sm rounded-md border border-input bg-background placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring transition-colors"
 		/>
 	</div>
 
 	{#if filtered.length === 0}
-		<p class="text-muted-foreground text-sm py-12 text-center">
+		<p class="text-muted-foreground text-sm text-center" style="padding: 3rem 0;">
 			{data.runs.length === 0 ? "No runs found. Check your RUNS_DIR." : "No runs match your filter."}
 		</p>
 	{:else}
@@ -37,45 +38,45 @@
 			<table class="w-full text-sm">
 				<thead>
 					<tr class="bg-muted/50 border-b border-border text-xs text-muted-foreground">
-						<th class="text-left px-4 py-2.5 font-medium">Run</th>
-						<th class="text-left px-4 py-2.5 font-medium">Model</th>
-						<th class="text-center px-4 py-2.5 font-medium">Sessions</th>
-						<th class="text-right px-4 py-2.5 font-medium">Steps</th>
-						<th class="text-right px-4 py-2.5 font-medium">Cost</th>
-						<th class="text-left px-4 py-2.5 font-medium">Tags</th>
-						<th class="text-right px-4 py-2.5 font-medium">Date</th>
+						<th class="text-left font-medium" style="padding: 0.875rem 1.25rem;">Run</th>
+						<th class="text-left font-medium" style="padding: 0.875rem 1.25rem;">Model</th>
+						<th class="text-center font-medium" style="padding: 0.875rem 1.25rem;">Sessions</th>
+						<th class="text-right font-medium" style="padding: 0.875rem 1.25rem;">Steps</th>
+						<th class="text-right font-medium" style="padding: 0.875rem 1.25rem;">Cost</th>
+						<th class="text-left font-medium" style="padding: 0.875rem 1.25rem;">Tags</th>
+						<th class="text-right font-medium" style="padding: 0.875rem 1.25rem;">Date</th>
 					</tr>
 				</thead>
 				<tbody>
 					{#each filtered as run}
 						<tr class="border-b border-border last:border-b-0 hover:bg-muted/30 transition-colors">
-							<td class="px-4 py-3">
+							<td style="padding: 1rem 1.25rem;">
 								<a href="/runs/{run.run_name}" class="font-medium text-sm hover:underline underline-offset-4">
 									{run.run_name}
 								</a>
 								{#if run.errors.length > 0}
-									<span class="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-destructive"></span>
+									<span class="inline-block rounded-full bg-destructive" style="margin-left: 0.375rem; width: 0.375rem; height: 0.375rem;"></span>
 								{/if}
-								<div class="flex items-center gap-1.5 mt-0.5">
+								<div class="flex items-center" style="gap: 0.5rem; margin-top: 0.375rem;">
 									<span class="text-xs text-muted-foreground">{run.provider}</span>
-									<span class="text-xs text-muted-foreground">&middot;</span>
+									<span class="text-xs text-muted-foreground/40">&middot;</span>
 									<span class="text-xs text-muted-foreground">{run.session_mode}</span>
 								</div>
 							</td>
-							<td class="px-4 py-3 text-muted-foreground font-mono text-xs">{run.model}</td>
-							<td class="px-4 py-3 text-center tabular-nums">{run.session_count}</td>
-							<td class="px-4 py-3 text-right tabular-nums">{run.total_steps}</td>
-							<td class="px-4 py-3 text-right tabular-nums font-mono text-xs">
+							<td style="padding: 1rem 1.25rem;" class="text-muted-foreground font-mono text-xs">{run.model}</td>
+							<td style="padding: 1rem 1.25rem;" class="text-center tabular-nums">{run.session_count}</td>
+							<td style="padding: 1rem 1.25rem;" class="text-right tabular-nums">{run.total_steps}</td>
+							<td style="padding: 1rem 1.25rem;" class="text-right tabular-nums font-mono text-xs">
 								{formatCost(run.total_cost_usd)}
 							</td>
-							<td class="px-4 py-3">
-								<div class="flex gap-1 flex-wrap">
+							<td style="padding: 1rem 1.25rem;">
+								<div class="flex flex-wrap" style="gap: 0.375rem;">
 									{#each run.tags as tag}
-										<span class="px-1.5 py-0.5 rounded-full text-[11px] border border-border text-foreground/70">{tag}</span>
+										<span class="rounded-full text-xs border border-border text-foreground/70" style="padding: 0.125rem 0.5rem;">{tag}</span>
 									{/each}
 								</div>
 							</td>
-							<td class="px-4 py-3 text-right text-muted-foreground text-xs whitespace-nowrap tabular-nums">
+							<td style="padding: 1rem 1.25rem;" class="text-right text-muted-foreground text-xs whitespace-nowrap tabular-nums">
 								{formatDate(run.started_at)}
 							</td>
 						</tr>

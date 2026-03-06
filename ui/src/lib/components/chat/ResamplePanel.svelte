@@ -175,6 +175,7 @@
 						{@const html = renderMarkdown(block.text)}
 						<div
 							class="text-sm prose prose-sm dark:prose-invert max-w-none prose-p:my-1.5 prose-headings:my-2 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-pre:my-2 prose-pre:bg-muted prose-pre:text-xs prose-code:text-xs prose-code:before:content-none prose-code:after:content-none"
+							style="color: var(--foreground);"
 						>
 							{@html html}
 						</div>

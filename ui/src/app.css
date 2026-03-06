@@ -83,4 +83,19 @@
 	body {
 		@apply bg-background text-foreground font-sans antialiased;
 	}
+	/* Override prose typography to use our theme foreground for better contrast */
+	.prose {
+		--tw-prose-body: var(--foreground);
+		--tw-prose-headings: var(--foreground);
+		--tw-prose-bold: var(--foreground);
+		--tw-prose-code: var(--foreground);
+		--tw-prose-links: var(--foreground);
+	}
+	.dark .prose {
+		--tw-prose-body: var(--foreground);
+		--tw-prose-headings: var(--foreground);
+		--tw-prose-bold: var(--foreground);
+		--tw-prose-code: var(--foreground);
+		--tw-prose-links: var(--foreground);
+	}
 }
