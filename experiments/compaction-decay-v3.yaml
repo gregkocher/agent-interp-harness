@@ -1,0 +1,101 @@
+model: "anthropic/claude-sonnet-4-20250514"
+provider: openrouter
+repo_path: "./repos/pytorch"
+session_mode: chained
+permission_mode: bypassPermissions
+max_turns: 99999
+max_budget_usd: 20.00
+capture_api_requests: true
+raw_dump_count: 9999
+hypothesis: "Context compaction causes systematic information loss where specific implementation details (exact default values, numerical constants, function signatures) decay faster than structural knowledge (class names, inheritance, module purposes), with earlier-discovered information decaying more than recent information"
+tags: ["auto-generated", "compaction", "memory-decay", "information-retention", "pytorch", "v3-no-subagents"]
+
+# CRITICAL: Disable Agent and TodoWrite to force all context into the main conversation
+disallowed_tools: ["Agent", "TodoWrite"]
+
+tracked_files:
+  - path: "MEMORY.md"
+    seed_content: |
+      # PyTorch Codebase Notes
+
+      Working notes from code review.
+  - path: "TECHNICAL_REFERENCE.md"
+    seed_content: ""
+
+system_prompt: |
+  You are a senior engineer documenting the PyTorch codebase for a new team joining next week. Use MEMORY.md as your working notebook. Always read MEMORY.md at the start of each work session. Do not delegate work to subagents — read all files yourself directly.
+
+sessions:
+  - session_index: 1
+    prompt: |
+      We need internal documentation for the new team. Read through the following Python files and keep organized notes in MEMORY.md as you go.
+
+      Keep your MEMORY.md notes as a high-level summary — module names, key classes, what they do, and notable patterns. Don't dump full signatures into the notes; just capture enough to orient someone. Focus your time on reading and understanding the code deeply.
+
+      Read these files IN ORDER. Read each file completely before moving to the next.
+
+      **Batch 1 — torch/nn/modules/ (neural network layers):**
+      1. flatten.py
+      2. dropout.py
+      3. linear.py
+      4. adaptive.py
+      5. fold.py
+      6. normalization.py
+      7. instancenorm.py
+      8. sparse.py
+      9. upsampling.py
+      10. lazy.py
+
+      **Batch 2 — torch/optim/ (optimizers):**
+      11. sgd.py
+      12. adam.py
+      13. adamw.py
+      14. adagrad.py
+      15. adadelta.py
+      16. adamax.py
+      17. rmsprop.py
+      18. rprop.py
+      19. asgd.py
+      20. lbfgs.py
+      21. sparse_adam.py
+
+      **Batch 3 — torch/autograd/ (automatic differentiation):**
+      22. forward_ad.py
+      23. grad_mode.py
+      24. anomaly_mode.py
+      25. function.py
+
+      For each file:
+      - Read the entire file
+      - Understand the public API (classes, functions, their purposes)
+      - Note the constructor parameters and their default values
+      - Note any numerical constants, magic numbers, or interesting implementation details
+      - Add a brief entry to MEMORY.md before moving to the next file
+
+      This is a thorough review — take your time with each file.
+
+  - session_index: 2
+    prompt: |
+      Read MEMORY.md for your notes from the code review.
+
+      Now the tech leads need a precise technical reference. Write TECHNICAL_REFERENCE.md with these sections:
+
+      **1. Complete Optimizer Defaults**
+      For every optimizer you reviewed, list the exact __init__ signature with every parameter and its default value. Format as code blocks.
+
+      **2. Neural Network Module Signatures**
+      For each nn.Module class you reviewed, list the __init__ signature with defaults and the forward() signature.
+
+      **3. Numerical Constants Inventory**
+      Every hardcoded number, magic constant, epsilon value, or default threshold you encountered. Include the file, the context, and the exact value.
+
+      **4. Class Hierarchy**
+      Which classes inherit from what? Show the inheritance relationships you found.
+
+      **5. Cross-Module Patterns**
+      Common design patterns, shared conventions, and recurring idioms across the three subsystems.
+
+      **6. Deprecations and Warnings**
+      Every deprecation notice, FutureWarning, or TODO you found. File and description.
+
+      Be precise — exact values, exact parameter names, exact signatures. The tech leads will verify against source. Work from your notes and your understanding of the code.
