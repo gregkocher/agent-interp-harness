@@ -1,0 +1,95 @@
+model: "anthropic/claude-sonnet-4-20250514"
+provider: openrouter
+repo_path: "./repos/pytorch"
+session_mode: chained
+permission_mode: bypassPermissions
+max_turns: 99999
+max_budget_usd: 20.00
+capture_api_requests: true
+raw_dump_count: 9999
+hypothesis: "During long coding sessions that trigger context compaction, specific implementation details (exact line numbers, numerical constants, function signatures) decay faster than structural/architectural knowledge, and information discovered earlier in the session decays more than recently-discovered information — measurable by checking citation accuracy in a final deliverable"
+tags: ["auto-generated", "compaction", "memory-decay", "information-retention", "pytorch", "security-audit", "citation-accuracy"]
+
+tracked_files:
+  - path: "MEMORY.md"
+    seed_content: |
+      # PyTorch Security Audit — Working Notes
+
+      Use this file as your working notebook throughout the audit.
+  - path: "SECURITY_REPORT.md"
+    seed_content: ""
+
+system_prompt: |
+  You are a senior security consultant conducting an audit of the PyTorch framework for a major enterprise client preparing to deploy PyTorch in production. Use MEMORY.md as your working notebook — read it at the start of each work session to check for prior notes.
+
+sessions:
+  - session_index: 1
+    prompt: |
+      Phase 1: Attack Surface Mapping
+
+      We need to map PyTorch's attack surface before diving into vulnerability analysis. Focus on four high-risk areas:
+
+      **1. Code Loading & Deserialization**
+      Investigate torch.load(), model serialization, and any code execution paths during deserialization. Start with torch/serialization.py and trace into the C++ layer. Look at how pickle is used, what safety mechanisms exist, and how TorchScript models are loaded (torch/jit/).
+
+      **2. Native Code Boundary**
+      Map the Python-to-C++ interface. Look at how Python tensor operations call into ATen/C++ kernels. Check torch/csrc/ for the binding layer, understand how custom C++ extensions are loaded (torch.utils.cpp_extension), and look at ctypes/cffi usage.
+
+      **3. Network-Facing Code**
+      Analyze torch.distributed/ — the c10d communication backends (ProcessGroupNCCL, ProcessGroupGloo, etc.), the RPC framework (torch/distributed/rpc/), and any HTTP/TCP listeners. Check for authentication, input validation, and protocol handling.
+
+      **4. File I/O & Path Handling**
+      Look at how PyTorch handles file paths in model loading, dataset access (torch/utils/data/), checkpoint saving, and logging. Check for path traversal, symlink following, and temp file handling.
+
+      For each area, read the actual source files. Note the key files, classes, functions, and any interesting patterns you find. Write a structured attack surface summary to MEMORY.md when you're done — organize it by the four areas above.
+
+  - session_index: 2
+    prompt: |
+      Read MEMORY.md for your attack surface notes from Phase 1.
+
+      Phase 2: Deep Vulnerability Analysis
+
+      Now drill into the highest-risk areas. For each, trace actual code paths and look for exploitable patterns:
+
+      **Deserialization Deep Dive:**
+      Trace the exact code path when a user calls torch.load("model.pt"). Follow every function call from the Python entry point through the unpickling logic. What classes get instantiated? What safety checks exist? Where could an attacker inject code? Read every file in the chain.
+
+      **RPC Framework Analysis:**
+      Read through torch/distributed/rpc/ thoroughly. How are messages serialized? What happens when a remote call arrives — trace from network receipt through deserialization to execution. Look for missing auth checks, injection points, and unsafe defaults.
+
+      **Autograd & Memory Safety:**
+      Look at the C++ autograd engine (torch/csrc/autograd/). Read the Engine, Node, and GraphTask implementations. Check for use-after-free patterns, race conditions in multi-threaded backward passes, and integer overflow in tensor shape calculations. Also check the CUDA caching allocator (c10/cuda/) for memory corruption risks.
+
+      **JIT Compiler:**
+      Explore torch/csrc/jit/ and torch/jit/. Look at how TorchScript is parsed, compiled, and executed. Check for code injection through malicious model files, unsafe optimizations, and sandbox escape possibilities.
+
+      Be thorough — read each file carefully, check related headers and tests. Note specific findings with file paths and function names. Update MEMORY.md with your most important findings if you think it's useful, but focus your time on the analysis itself rather than note-taking.
+
+  - session_index: 3
+    prompt: |
+      Read MEMORY.md for context from your earlier work.
+
+      Phase 3: Final Security Assessment Report
+
+      Write the final security report to SECURITY_REPORT.md. The client's CTO and their security team will review this — they will spot-check every file path and function reference you cite, so accuracy matters.
+
+      Structure the report as:
+
+      1. **Executive Summary** — Overall risk assessment, top 3 most critical findings, key recommendations.
+
+      2. **Attack Surface Overview** — Summarize the four areas you mapped in Phase 1. For each, list the key entry points with exact file paths and the main classes/functions involved.
+
+      3. **Detailed Findings** — For each vulnerability or security concern:
+         - Title and severity (Critical / High / Medium / Low)
+         - Affected component with exact file path(s)
+         - Description of the issue with specific function names and line references where the pattern appears
+         - Proof of concept or exploitation scenario
+         - Recommended remediation
+
+      4. **Code Path Traces** — Include the full deserialization code path trace (torch.load → ... → final object), and the RPC message handling trace. Show each function call with file:function format.
+
+      5. **Numerical Details** — Any security-relevant constants, buffer sizes, timeout values, pool sizes, or configuration defaults you found. Include the exact values and where they're defined.
+
+      6. **Recommendations** — Prioritized list of security improvements, each tied to specific findings above.
+
+      Be specific throughout. Reference exact file paths, function names, class names, and constant values. The client is paying for precision, not generalities.

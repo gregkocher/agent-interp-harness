@@ -1,0 +1,118 @@
+model: "anthropic/claude-sonnet-4-20250514"
+provider: openrouter
+repo_path: "./repos/pytorch"
+session_mode: chained
+permission_mode: bypassPermissions
+max_turns: 99999
+max_budget_usd: 20.00
+capture_api_requests: true
+raw_dump_count: 9999
+hypothesis: "Context compaction causes systematic information loss where specific details (exact function signatures, numerical default values, line numbers) decay faster than structural knowledge (class hierarchies, module purposes, design patterns), and information discovered earlier in a long session decays more than recently-discovered information"
+tags: ["auto-generated", "compaction", "memory-decay", "information-retention", "pytorch", "exhaustive-reading"]
+
+tracked_files:
+  - path: "MEMORY.md"
+    seed_content: |
+      # PyTorch Internal API Documentation
+
+      Working notes from codebase review.
+  - path: "TECHNICAL_REFERENCE.md"
+    seed_content: ""
+
+system_prompt: |
+  You are a senior engineer creating internal documentation for the PyTorch codebase. A new team of engineers is joining next week and needs comprehensive API references for core subsystems. Use MEMORY.md as your working notebook — always read it at the start of each session to check for prior notes.
+
+sessions:
+  - session_index: 1
+    prompt: |
+      We need comprehensive internal API documentation before the new team starts. Your job is to read through every Python source file in four key directories and create detailed per-file documentation in MEMORY.md.
+
+      Work through these directories IN ORDER:
+
+      **Directory 1: torch/nn/modules/**
+      Files to read (ALL of them, in this order):
+        activation.py, adaptive.py, batchnorm.py, channelshuffle.py,
+        container.py, conv.py, distance.py, dropout.py, flatten.py,
+        fold.py, instancenorm.py, lazy.py, linear.py, loss.py,
+        module.py, normalization.py, padding.py, pixelshuffle.py,
+        pooling.py, rnn.py, sparse.py, transformer.py, upsampling.py, utils.py
+
+      For each file, document:
+      - Every public class defined (name and one-line description)
+      - The __init__ signature with ALL parameter names and their default values
+      - The forward() signature
+      - Any numerical constants, hardcoded defaults, or magic numbers
+      - Any deprecation warnings or TODOs
+
+      **Directory 2: torch/optim/**
+      Files to read (ALL of them):
+        adam.py, adamw.py, sgd.py, adagrad.py, adadelta.py, adamax.py,
+        asgd.py, lbfgs.py, nadam.py, radam.py, rmsprop.py, rprop.py,
+        sparse_adam.py, _adafactor.py, _muon.py, optimizer.py,
+        lr_scheduler.py, swa_utils.py
+
+      For each optimizer, document:
+      - The optimization algorithm (one sentence)
+      - The __init__ signature with every hyperparameter and its default value
+      - Key details from the step() implementation
+
+      **Directory 3: torch/autograd/**
+      Files to read (ALL of them):
+        __init__.py, function.py, functional.py, grad_mode.py,
+        gradcheck.py, graph.py, forward_ad.py, anomaly_mode.py,
+        variable.py
+
+      Document:
+      - All public functions and their signatures
+      - The Function class API (forward, backward, etc.)
+      - Hook registration mechanisms and their signatures
+      - Context manager classes
+
+      **Directory 4: torch/distributed/**
+      Top-level .py files only (not subdirectories):
+        __init__.py, constants.py, config.py, _functional_collectives.py,
+        _state_dict_utils.py, collective_utils.py, c10d_logger.py
+
+      Document:
+      - The distributed training API (init_process_group, etc.)
+      - Available backends and their properties
+      - Collective operation functions and signatures
+      - Any constants or configuration defaults
+
+      IMPORTANT INSTRUCTIONS:
+      - Read EVERY file listed above. Do not skip any.
+      - Read each file fully — do not stop after the first few classes.
+      - After reading each file, immediately add your documentation for that file to MEMORY.md before moving to the next file.
+      - Organize MEMORY.md by directory, then by file.
+      - Include exact default values for all parameters (e.g., lr=0.001, not just "learning rate").
+      - This is the primary reference the new engineers will use, so completeness matters more than brevity.
+
+  - session_index: 2
+    prompt: |
+      Read MEMORY.md for your documentation notes from the previous session.
+
+      The tech leads reviewed your per-file documentation and now need a cross-cutting technical reference. Write TECHNICAL_REFERENCE.md with these sections:
+
+      **1. Complete Parameter Defaults Inventory**
+      For every optimizer you documented, create a table with: optimizer name, every hyperparameter, and its exact default value.
+      For nn.Module classes with significant hyperparameters (e.g., Dropout's p, BatchNorm's momentum), list them all with exact defaults.
+
+      **2. Class Hierarchy**
+      Map the complete inheritance tree for nn.Module subclasses. Which classes inherit from which? Group by category (convolutions, recurrent, normalization, attention, loss functions, etc.)
+
+      **3. Top 10 Most Complex Signatures**
+      List the 10 classes with the most __init__ parameters (across nn.modules and optim). Give the exact full signature for each.
+
+      **4. Forward Method Taxonomy**
+      Categorize all forward() signatures you documented. How many take just (self, input)? How many take hidden states? What other patterns exist? List specific classes for each pattern.
+
+      **5. Cross-Subsystem Design Patterns**
+      What common patterns appear across nn, optim, autograd, and distributed? (e.g., factory functions, context managers, hook registries). Give specific class/function examples.
+
+      **6. All Deprecations and Warnings**
+      List every deprecation notice, FutureWarning, or TODO you encountered. Include the file path and what it says.
+
+      **7. Numerical Constants Inventory**
+      List every hardcoded numerical constant, magic number, or notable default you found across all four directories. Include the file, the constant name or context, and its value.
+
+      Work primarily from your notes in MEMORY.md and your understanding of the code. Be precise — the tech leads will spot-check values against the source.
